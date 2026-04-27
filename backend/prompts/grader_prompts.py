@@ -1,5 +1,6 @@
-GRADER_SYSTEM = """You are a strict but fair exam grader. You grade based on the rubric provided.
-Return ONLY valid JSON. No markdown. No explanation."""
+GRADER_SYSTEM = """You are a fair and experienced exam grader. You grade based on the rubric provided.
+You understand that students may make minor spelling mistakes, use informal phrasing, or write in broken sentences — this is normal in handwritten exams.
+Return ONLY valid JSON. No markdown. No explanation outside the JSON."""
 
 
 def get_mcq_grader_prompt(rubric: dict, student_answers: list) -> str:
@@ -45,7 +46,10 @@ STUDENT ANSWERS:
 
 Rules:
 - Accept exact matches AND acceptable_alternatives listed in the rubric
-- Ignore case and minor spelling variations (1-2 character difference)
+- Ignore case differences completely
+- Accept minor spelling mistakes (1-3 character edits, e.g. "mimic" vs "minic", "intelligence" vs "inteligence")
+- Accept common OCR/handwriting artefacts: missing letters, swapped letters, extra spaces
+- Accept answers that convey the same meaning even if worded differently
 - If unclear: needs_review: true, award 0
 - Partial credit NOT allowed unless partial_marks_allowed is true
 
@@ -67,7 +71,7 @@ Return ONLY this JSON:
 
 
 def get_short_answer_grader_prompt(rubric: dict, student_answers: list) -> str:
-    return f"""Grade these Short Answer responses.
+    return f"""Grade these Short Answer responses. Students wrote by hand — expect spelling mistakes, abbreviations, and informal phrasing.
 
 ANSWER KEY AND RUBRIC:
 {rubric}
@@ -75,13 +79,22 @@ ANSWER KEY AND RUBRIC:
 STUDENT ANSWERS:
 {student_answers}
 
-Rules:
+Spelling and language rules (IMPORTANT):
+- Ignore all spelling mistakes. "minic" = "mimic", "inteligence" = "intelligence", "compter" = "computer"
+- Ignore capitalisation differences
+- Ignore extra/missing spaces and punctuation
+- Ignore grammar issues — focus on whether the concept is correct
+- Accept synonyms and paraphrases that convey the same meaning
+- Accept abbreviations if unambiguous (e.g. "ML" = "Machine Learning", "AI" = "Artificial Intelligence")
+- DO NOT penalise for poor handwriting artefacts (OCR may have introduced errors)
+
+Grading rules:
 - Check if the student answer covers the key concepts (keywords list)
-- Award marks proportionally based on keyword coverage
-- Full marks: all keywords present + conceptually accurate
-- Partial marks: some keywords present
-- 0 marks: completely wrong or blank
-- If unclear: needs_review: true
+- Award marks proportionally based on concept coverage
+- Full marks: all key concepts present (even if worded differently or with spelling errors)
+- Partial marks: some concepts covered
+- 0 marks: completely wrong, off-topic, or blank
+- If the answer is ambiguous due to illegible handwriting: needs_review: true
 
 Return ONLY this JSON:
 {{
@@ -101,7 +114,7 @@ Return ONLY this JSON:
 
 
 def get_descriptive_grader_prompt(rubric: dict, student_answers: list) -> str:
-    return f"""Grade these Descriptive answers using the rubric.
+    return f"""Grade these Descriptive answers. Students wrote by hand — expect spelling mistakes, abbreviations, and informal phrasing.
 
 ANSWER KEY AND RUBRIC:
 {rubric}
@@ -109,17 +122,25 @@ ANSWER KEY AND RUBRIC:
 STUDENT ANSWERS:
 {student_answers}
 
+Spelling and language rules (IMPORTANT):
+- Ignore ALL spelling mistakes — grade on ideas, not spelling
+- "machene lerning" still means "machine learning" — award concept credit
+- Ignore capitalisation, punctuation, grammar issues
+- Accept synonyms and paraphrases freely
+- Accept abbreviations (ML, AI, NLP, etc.)
+- DO NOT deduct marks for poor spelling or grammar
+- Only flag needs_review: true if the meaning is truly unreadable
+
 Grading dimensions for each answer:
-1. Content accuracy (40% weight): Are the facts correct?
-2. Keyword coverage (30% weight): Are key concepts mentioned?
+1. Content accuracy (40% weight): Are the core facts/concepts correct?
+2. Keyword coverage (30% weight): Are key ideas present (even if misspelled)?
 3. Completeness (20% weight): Is the answer adequately detailed?
-4. Clarity (10% weight): Is the argument clear and structured?
+4. Clarity (10% weight): Can you understand what they mean?
 
 Rules:
 - Award marks on a sliding scale from 0 to marks_possible
-- Be consistent — same quality answer always gets same marks
-- If unclear handwriting: needs_review: true
-- Write specific feedback mentioning what was good and what was missing
+- Be generous with spelling/language — a student who knows the concept but can't spell gets full concept credit
+- Write feedback that mentions what was correct and what specific concept was missing
 
 Return ONLY this JSON:
 {{
@@ -132,14 +153,14 @@ Return ONLY this JSON:
       "marks_possible": 10,
       "correct": false,
       "needs_review": false,
-      "feedback": "Good explanation of X. Missing Y and Z. Argument lacks structure."
+      "feedback": "Good explanation of X. Missing Y and Z. Spelling errors present but concept is clear."
     }}
   ]
 }}"""
 
 
 def get_mixed_grader_prompt(rubric: dict, student_answers: list) -> str:
-    return f"""Grade this mixed exam. Each question has its own type.
+    return f"""Grade this mixed exam. Each question has its own type. Students wrote by hand — expect spelling mistakes and informal phrasing.
 
 ANSWER KEY AND RUBRIC (includes type per question):
 {rubric}
@@ -147,11 +168,17 @@ ANSWER KEY AND RUBRIC (includes type per question):
 STUDENT ANSWERS:
 {student_answers}
 
-Per-question rules:
-- MCQ: exact match only, full marks or 0
-- FILL_IN_THE_BLANKS: accept alternatives, minor spelling ok
-- SHORT_ANSWER: keyword coverage, proportional marks
-- DESCRIPTIVE: rubric-based sliding scale, specific feedback
+Global spelling rules (apply to ALL question types):
+- Ignore spelling mistakes — grade on concepts and meaning
+- Ignore capitalisation and punctuation
+- Accept synonyms, paraphrases, and common abbreviations (ML, AI, NLP, etc.)
+- DO NOT penalise for OCR artefacts or poor handwriting
+
+Per-question type rules:
+- MCQ: exact letter match only (a/b/c/d), full marks or 0
+- FILL_IN_THE_BLANKS: accept alternatives, ignore spelling variations up to 3 character edits
+- SHORT_ANSWER: keyword/concept coverage with proportional marks, spelling ignored
+- DESCRIPTIVE: rubric-based sliding scale, grade on ideas not language quality
 
 Return ONLY this JSON:
 {{

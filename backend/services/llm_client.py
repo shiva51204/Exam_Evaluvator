@@ -1,5 +1,6 @@
 import requests
 import json
+import re
 import time
 import os
 from dotenv import load_dotenv
@@ -40,6 +41,13 @@ def call_llm(messages: list, max_tokens: int = 4096, temperature: float = 0.1) -
             )
             response.raise_for_status()
             data = response.json()
+
+            # Check finish reason — warn if truncated
+            finish_reason = data["choices"][0].get("finish_reason", "")
+            if finish_reason == "length":
+                print(f"[LLM] WARNING: Response was truncated (finish_reason=length). "
+                      f"Consider increasing max_tokens (currently {max_tokens}).")
+
             content = data["choices"][0]["message"]["content"]
             return content
 
@@ -48,7 +56,6 @@ def call_llm(messages: list, max_tokens: int = 4096, temperature: float = 0.1) -
         except requests.exceptions.HTTPError as e:
             status = e.response.status_code if e.response else "unknown"
             print(f"[LLM] HTTP error {status} on attempt {attempt}/{MAX_RETRIES}: {e}")
-            # Don't retry on 4xx client errors except 429 rate limit
             if e.response and e.response.status_code not in [429, 500, 502, 503]:
                 return None
         except Exception as e:
@@ -64,21 +71,120 @@ def call_llm(messages: list, max_tokens: int = 4096, temperature: float = 0.1) -
 
 
 def parse_llm_json(raw: str) -> dict | None:
-    """Clean and parse JSON from LLM response."""
+    """
+    Clean and parse JSON from LLM response.
+    Handles:
+    - Markdown code fences (```json ... ```)
+    - Preamble text before the JSON object
+    - Truncated JSON (attempts recovery by closing open structures)
+    """
     if not raw:
         return None
-    try:
-        cleaned = raw.strip()
-        # Strip markdown code fences
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("```")[1]
-            if cleaned.startswith("json"):
-                cleaned = cleaned[4:]
-        cleaned = cleaned.strip()
-        return json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        print(f"[LLM] JSON parse error: {e}. Raw: {raw[:300]}")
+
+    cleaned = raw.strip()
+
+    # ── 1. Strip markdown code fences ──────────────────────────────────
+    if "```" in cleaned:
+        # Extract content between first ``` and last ```
+        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)(?:```|$)", cleaned)
+        if fence_match:
+            cleaned = fence_match.group(1).strip()
+
+    # ── 2. Find the first { or [ — skip any preamble text ──────────────
+    first_brace = -1
+    for i, ch in enumerate(cleaned):
+        if ch in ('{', '['):
+            first_brace = i
+            break
+
+    if first_brace == -1:
+        print(f"[LLM] No JSON object found in response. Raw[:300]: {raw[:300]}")
         return None
+
+    cleaned = cleaned[first_brace:]
+
+    # ── 3. Try direct parse first ──────────────────────────────────────
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # ── 4. Truncation recovery — try to close open JSON structures ─────
+    print(f"[LLM] JSON incomplete, attempting truncation recovery...")
+    recovered = _recover_truncated_json(cleaned)
+    if recovered:
+        try:
+            result = json.loads(recovered)
+            print(f"[LLM] Truncation recovery succeeded.")
+            return result
+        except json.JSONDecodeError:
+            pass
+
+    print(f"[LLM] JSON parse failed even after recovery. Raw[:300]: {raw[:300]}")
+    return None
+
+
+def _recover_truncated_json(partial: str) -> str | None:
+    """
+    Attempt to close a truncated JSON string by tracking open braces/brackets/strings.
+    Returns a potentially valid JSON string, or None if recovery is not possible.
+    """
+    # Remove the last incomplete object/array entry up to the last complete comma-separated item
+    # Strategy: find the last complete item by looking for the last }, or ] or "value" before truncation
+
+    stack = []       # track open { and [
+    in_string = False
+    escape_next = False
+    last_safe_pos = 0  # position after the last complete top-level item
+
+    i = 0
+    while i < len(partial):
+        ch = partial[i]
+
+        if escape_next:
+            escape_next = False
+            i += 1
+            continue
+
+        if ch == '\\' and in_string:
+            escape_next = True
+            i += 1
+            continue
+
+        if ch == '"':
+            in_string = not in_string
+            i += 1
+            continue
+
+        if in_string:
+            i += 1
+            continue
+
+        if ch in ('{', '['):
+            stack.append(ch)
+        elif ch in ('}', ']'):
+            if stack:
+                stack.pop()
+                # If stack is at depth 1 (inside top-level object/array), mark safe position
+                if len(stack) == 1:
+                    last_safe_pos = i + 1
+        elif ch == ',' and len(stack) == 1:
+            last_safe_pos = i + 1  # after comma is a safe truncation point
+
+        i += 1
+
+    if not stack:
+        # Wasn't actually truncated
+        return partial
+
+    # Truncate to last safe position and close all open structures
+    truncated = partial[:last_safe_pos].rstrip().rstrip(',')
+
+    # Close all open structures in reverse order
+    closers = {'{': '}', '[': ']'}
+    closing = ''.join(closers[s] for s in reversed(stack))
+
+    return truncated + closing
 
 
 def call_llm_with_image(
@@ -86,7 +192,7 @@ def call_llm_with_image(
     user_text: str,
     images_b64: list,
     mime_type: str = "image/jpeg",
-    max_tokens: int = 4096
+    max_tokens: int = 6000   # Raised from 4096 — handwritten sheets produce long OCR JSON
 ) -> str | None:
     """
     Call LLM with image(s) attached.
