@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Exam Evaluator</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f9; display: flex; justify-content: center; padding: 40px; }
+        .box { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 400px; }
+        h2 { color: #2c3e50; margin-top: 0; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:disabled { background: #bdc3c7; }
+        #loader { display: none; margin-top: 20px; text-align: center; color: #7f8c8d; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Exam Corrector</h2>
+        <form id="uploadForm">
+            <div class="input-group">
+                <label>Answer Key (PDF)</label>
+                <input type="file" id="key" accept=".pdf" required>
+            </div>
+            <div class="input-group">
+                <label>Student Sheets (Multiple PDFs)</label>
+                <input type="file" id="sheets" accept=".pdf" multiple required>
+            </div>
+            <div class="input-group">
+                <label>Total Marks</label>
+                <input type="number" id="marks" value="20">
+            </div>
+            <button type="submit" id="submitBtn">Start Evaluation</button>
+        </form>
+        <div id="loader">⚙️ AI is reading handwriting... this can take a few minutes for multiple students.</div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const loader = document.getElementById('loader');
+            
+            btn.disabled = true;
+            loader.style.display = 'block';
+
+            const formData = new FormData();
+            formData.append('answer_key', document.getElementById('key').files[0]);
+            formData.append('total_marks', document.getElementById('marks').value);
+            const files = document.getElementById('sheets').files;
+            for (let i = 0; i < files.length; i++) { formData.append('student_sheets', files[i]); }
+
+            try {
+                const response = await fetch('/process-exams', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error('Server Error or Timeout');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Exam_Results_${Date.now()}.csv`;
+                document.body.appendChild(a);
+                a.click();
+            } catch (err) {
+                alert("Processing failed: " + err.message);
+            } finally {
+                btn.disabled = false;
+                loader.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+</html>
