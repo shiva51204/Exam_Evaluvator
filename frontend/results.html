@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Results — ExamGrade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="noise-overlay"></div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <a href="index.html" style="text-decoration:none;display:flex;align-items:center;gap:10px">
+          <span class="logo-mark">EG</span>
+          <span class="logo-text">ExamGrade</span>
+        </a>
+      </div>
+      <nav class="header-nav">
+        <a href="index.html" class="nav-back">← New Exam</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="results-main">
+    <!-- Summary Banner -->
+    <section class="summary-banner" id="summary-banner">
+      <div class="summary-inner">
+        <div class="summary-heading">
+          <div class="summary-label">Results</div>
+          <h1 class="summary-title" id="summary-title">Loading...</h1>
+          <div class="summary-tags" id="summary-tags"></div>
+        </div>
+        <div class="summary-metrics">
+          <div class="metric-card">
+            <div class="metric-val" id="m-avg">—</div>
+            <div class="metric-lbl">Class Average</div>
+          </div>
+          <div class="metric-card highlight">
+            <div class="metric-val" id="m-high">—</div>
+            <div class="metric-lbl">Highest</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-val" id="m-low">—</div>
+            <div class="metric-lbl">Lowest</div>
+          </div>
+          <div class="metric-card warn">
+            <div class="metric-val" id="m-flag">—</div>
+            <div class="metric-lbl">Flagged</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="results-controls">
+      <div class="controls-inner">
+        <div class="search-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="search-input" placeholder="Search students..." />
+        </div>
+        <div class="filter-wrap">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="flagged">Flagged</button>
+          <button class="filter-btn" data-filter="pass">Pass</button>
+          <button class="filter-btn" data-filter="fail">Fail</button>
+        </div>
+        <div class="sort-wrap">
+          <select id="sort-select">
+            <option value="score-desc">Score ↓</option>
+            <option value="score-asc">Score ↑</option>
+            <option value="name">Name A–Z</option>
+            <option value="flagged">Flagged First</option>
+          </select>
+        </div>
+        <div class="download-wrap">
+          <button class="btn-download" id="btn-csv">↓ Full CSV</button>
+          <button class="btn-download secondary" id="btn-flagged-csv">↓ Flagged CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grade Distribution -->
+    <section class="distribution-section">
+      <div class="dist-inner">
+        <div class="dist-title">Grade Distribution</div>
+        <div class="dist-chart" id="dist-chart">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Results Table -->
+    <section class="table-section">
+      <div class="table-wrap">
+        <table class="results-table" id="results-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Student</th>
+              <th>Score</th>
+              <th>%</th>
+              <th>Grade</th>
+              <th>Status</th>
+              <th>Time</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+        <div class="empty-state" id="empty-state" hidden>No results match your filter.</div>
+      </div>
+    </section>
+
+    <!-- Student Detail Drawer -->
+    <div class="detail-drawer" id="detail-drawer" hidden>
+      <div class="drawer-backdrop" id="drawer-backdrop"></div>
+      <div class="drawer-panel">
+        <div class="drawer-header">
+          <div>
+            <div class="drawer-name" id="drawer-name">Student Name</div>
+            <div class="drawer-meta" id="drawer-meta"></div>
+          </div>
+          <button class="drawer-close" id="drawer-close">✕</button>
+        </div>
+        <div class="drawer-score-row">
+          <div class="drawer-score-big" id="drawer-score-big">—/—</div>
+          <div class="grade-badge" id="drawer-grade-badge">A</div>
+        </div>
+        <div class="drawer-questions" id="drawer-questions"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/results.js"></script>
+</body>
+</html>

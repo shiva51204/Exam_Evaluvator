@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExamGrade — Automated Exam Evaluator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="noise-overlay"></div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-mark">EG</span>
+        <span class="logo-text">ExamGrade</span>
+      </div>
+      <nav class="header-nav">
+        <span class="nav-tag">v1.0</span>
+        <span class="nav-status" id="api-status">● Connecting...</span>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="hero">
+      <div class="hero-label">AI-Powered Evaluation</div>
+      <h1 class="hero-title">Grade<br/><em>handwritten</em><br/>exams instantly.</h1>
+      <p class="hero-sub">Upload answer key + student sheets. Get scores, feedback, and a downloadable CSV — in minutes.</p>
+    </section>
+
+    <section class="upload-section">
+      <form id="grade-form" class="grade-form">
+
+        <!-- Exam Settings -->
+        <div class="form-block">
+          <div class="block-header">
+            <span class="block-num">01</span>
+            <span class="block-title">Exam Settings</span>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label for="exam-title">Exam Title</label>
+              <input type="text" id="exam-title" name="exam_title" placeholder="e.g. Biology Mid-Term 2024" />
+            </div>
+            <div class="field-group narrow">
+              <label for="total-marks">Total Marks <span class="required">*</span></label>
+              <input type="number" id="total-marks" name="total_marks" placeholder="100" min="1" max="1000" required />
+            </div>
+          </div>
+        </div>
+
+        <!-- Answer Key Upload -->
+        <div class="form-block">
+          <div class="block-header">
+            <span class="block-num">02</span>
+            <span class="block-title">Answer Key</span>
+          </div>
+          <div class="drop-zone" id="key-drop" data-target="answer-key-input">
+            <div class="drop-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+            </div>
+            <div class="drop-text">
+              <strong>Drop answer key PDF here</strong>
+              <span>or click to browse</span>
+            </div>
+            <div class="drop-hint">Single PDF · Max 20MB · Text or typed</div>
+            <input type="file" id="answer-key-input" name="answer_key" accept=".pdf" required hidden />
+          </div>
+          <div class="file-preview" id="key-preview"></div>
+        </div>
+
+        <!-- Student Sheets Upload -->
+        <div class="form-block">
+          <div class="block-header">
+            <span class="block-num">03</span>
+            <span class="block-title">Student Answer Sheets</span>
+          </div>
+          <div class="drop-zone multi" id="sheets-drop" data-target="student-sheets-input">
+            <div class="drop-icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="11" x2="12" y2="17"/>
+                <line x1="9" y1="14" x2="15" y2="14"/>
+              </svg>
+            </div>
+            <div class="drop-text">
+              <strong>Drop student PDFs here</strong>
+              <span>or click to select multiple</span>
+            </div>
+            <div class="drop-hint">Multiple PDFs allowed · Max 100 students · Max 20MB each</div>
+            <input type="file" id="student-sheets-input" name="student_sheets" accept=".pdf" multiple required hidden />
+          </div>
+          <div class="sheets-list" id="sheets-list"></div>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-submit">
+          <button type="submit" class="btn-grade" id="submit-btn">
+            <span class="btn-text">Start Grading</span>
+            <span class="btn-arrow">→</span>
+          </button>
+          <p class="submit-note">Processing time: ~15–30s per student sheet</p>
+        </div>
+
+      </form>
+    </section>
+  </main>
+
+  <!-- Progress Overlay -->
+  <div class="progress-overlay" id="progress-overlay" hidden>
+    <div class="progress-panel">
+      <div class="progress-header">
+        <h2 class="progress-title">Grading in Progress</h2>
+        <div class="progress-meta" id="progress-meta">Initializing...</div>
+      </div>
+
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+      </div>
+
+      <div class="progress-stats">
+        <div class="stat-item">
+          <span class="stat-val" id="stat-done">0</span>
+          <span class="stat-lbl">Done</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-val" id="stat-total">0</span>
+          <span class="stat-lbl">Total</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-val" id="stat-flagged">0</span>
+          <span class="stat-lbl">Flagged</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-val" id="stat-avg">—</span>
+          <span class="stat-lbl">Avg Score</span>
+        </div>
+      </div>
+
+      <div class="feed-log" id="feed-log"></div>
+
+      <div class="progress-rubric" id="rubric-info"></div>
+    </div>
+  </div>
+
+  <script src="js/upload.js"></script>
+  <script src="js/progress.js"></script>
+</body>
+</html>
